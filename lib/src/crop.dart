@@ -74,7 +74,7 @@ class Crop extends StatelessWidget {
   /// [CornerDotBuilder] passes [size] which indicates the size of each dots
   /// and [EdgeAlignment] which indicates the position of each dots.
   /// If default dot Widget with different color is needed, [DotControl] is available.
-  final Widget? cornerDotBuilder;
+  final CornerDotBuilder? cornerDotBuilder;
 
   /// If [true], cropping area is fixed and CANNOT be moved.
   /// [false] by default.
