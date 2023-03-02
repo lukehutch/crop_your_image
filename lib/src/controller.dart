@@ -8,10 +8,7 @@ class CropController {
   set delegate(CropControllerDelegate value) => _delegate = value;
 
   /// crop given image with current configuration
-  void crop() => _delegate.onCrop(false);
-
-  /// crop given image with current configuration and circle shape.
-  void cropCircle() => _delegate.onCrop(true);
+  Future<img.Image> crop() => _delegate.onCrop();
 
   /// Change image to be cropped.
   /// When image is changed, [Rect] of cropping area will be reset.
@@ -31,13 +28,15 @@ class CropController {
 
   /// change [Rect] of cropping area based on [Rect] of original imgage.
   set area(Rect value) => _delegate.onChangeArea(value);
+
+  /// Reset the cropping area
+  void resetCroppingArea() => _delegate.onResetCroppingArea();
 }
 
 /// Delegate of actions from [CropController]
 class CropControllerDelegate {
   /// callback that [CropController.crop] is called.
-  /// the meaning of the value is if cropping a image with circle shape.
-  late ValueChanged<bool> onCrop;
+  late Future<img.Image> Function() onCrop;
 
   /// callback that [CropController.image] is set.
   late ValueChanged<Uint8List> onImageChanged;
@@ -53,4 +52,8 @@ class CropControllerDelegate {
 
   /// callback that [CropController.area] is changed.
   late ValueChanged<Rect> onChangeArea;
+
+  /// Callback that the cropping area should be reset,
+  /// possibly with a different aspect ratio
+  late void Function() onResetCroppingArea;
 }

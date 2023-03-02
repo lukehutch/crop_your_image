@@ -15,7 +15,7 @@ class Crop extends StatelessWidget {
   final Uint8List image;
 
   /// callback when cropping completed
-  final ValueChanged<Uint8List> onCropped;
+  final ValueChanged<img.Image> onCropped;
 
   /// fixed aspect ratio of cropping area.
   /// null, by default, means no fixed aspect ratio.
@@ -42,7 +42,8 @@ class Crop extends StatelessWidget {
   /// If [initialArea] is given, [initialSize] is ignored.
   /// In other hand, [aspectRatio] is still enabled although initial shape of
   /// cropping area depends on [initialArea]. Once user moves cropping area
-  /// with their hand, the shape of cropping area is calculated depending on [aspectRatio].
+  /// with their hand, the shape of cropping area is calculated depending on
+  /// [aspectRatio].
   final Rect? initialArea;
 
   /// flag if cropping image with circle shape.
@@ -148,7 +149,7 @@ class Crop extends StatelessWidget {
 
 class _CropEditor extends StatefulWidget {
   final Uint8List image;
-  final ValueChanged<Uint8List> onCropped;
+  final ValueChanged<img.Image> onCropped;
   final double? aspectRatio;
   final double? initialSize;
   final CroppingAreaBuilder? initialAreaBuilder;
@@ -193,13 +194,13 @@ class _CropEditor extends StatefulWidget {
 class _CropEditorState extends State<_CropEditor> {
   late CropController _cropController;
   late Rect _rect;
-  image.Image? _targetImage;
+  img.Image? _targetImage;
   late Rect _imageRect;
 
   double? _aspectRatio;
   bool _withCircleUi = false;
   bool _isFitVertically = false;
-  Future<image.Image?>? _lastComputed;
+  Future<img.Image?>? _lastComputed;
 
   bool get _isImageLoading => _lastComputed != null;
 
@@ -307,6 +308,7 @@ class _CropEditorState extends State<_CropEditor> {
 
   @override
   void initState() {
+    _aspectRatio = widget.aspectRatio;
     _cropController = widget.controller ?? CropController();
     _cropController.delegate = CropControllerDelegate()
       ..onCrop = _crop
@@ -323,7 +325,8 @@ class _CropEditorState extends State<_CropEditor> {
       }
       ..onChangeArea = (newArea) {
         _resizeWith(_aspectRatio, newArea);
-      };
+      }
+      ..onResetCroppingArea = () => _resetCroppingArea();
 
     super.initState();
   }
@@ -416,7 +419,7 @@ class _CropEditorState extends State<_CropEditor> {
   }
 
   /// crop given image with given area.
-  Future<void> _crop(bool withCircleShape) async {
+  Future<img.Image> _crop() {
     assert(_targetImage != null);
 
     final screenSizeRatio = calculator.screenSizeRatio(
@@ -426,22 +429,19 @@ class _CropEditorState extends State<_CropEditor> {
 
     widget.onStatusChanged?.call(CropStatus.cropping);
 
-    // use compute() not to block UI update
-    final cropResult = await compute(
-      withCircleShape ? _doCropCircle : _doCrop,
-      [
-        _targetImage!,
-        Rect.fromLTWH(
-          (_rect.left - _imageRect.left) * screenSizeRatio / _scale,
-          (_rect.top - _imageRect.top) * screenSizeRatio / _scale,
-          _rect.width * screenSizeRatio / _scale,
-          _rect.height * screenSizeRatio / _scale,
-        ),
-      ],
-    );
-    widget.onCropped(cropResult);
-
-    widget.onStatusChanged?.call(CropStatus.ready);
+    return compute<_CopyCropParams, img.Image>(
+      _copyCrop,
+      _CopyCropParams(
+        image: _targetImage!,
+        x: (_rect.left - _imageRect.left) * screenSizeRatio ~/ _scale,
+        y: (_rect.top - _imageRect.top) * screenSizeRatio ~/ _scale,
+        width: _rect.width * screenSizeRatio ~/ _scale,
+        height: _rect.height * screenSizeRatio ~/ _scale,
+      ),
+    )..then((cropResult) {
+        widget.onCropped(cropResult);
+        widget.onStatusChanged?.call(CropStatus.ready);
+      });
   }
 
   @override
@@ -686,58 +686,36 @@ class DotControl extends StatelessWidget {
   }
 }
 
-/// process cropping image.
-/// this method is supposed to be called only via compute()
-Uint8List _doCrop(List<dynamic> cropData) {
-  final originalImage = cropData[0] as image.Image;
-  final rect = cropData[1] as Rect;
-  return Uint8List.fromList(
-    image.encodePng(
-      image.copyCrop(
-        originalImage,
-        x: rect.left.toInt(),
-        y: rect.top.toInt(),
-        width: rect.width.toInt(),
-        height: rect.height.toInt(),
-      ),
-    ),
-  );
-}
-
-/// process cropping image with circle shape.
-/// this method is supposed to be called only via compute()
-Uint8List _doCropCircle(List<dynamic> cropData) {
-  final originalImage = cropData[0] as image.Image;
-  final rect = cropData[1] as Rect;
-  final center = image.Point(
-    rect.left + rect.width / 2,
-    rect.top + rect.height / 2,
-  );
-  return Uint8List.fromList(
-    image.encodePng(
-      image.copyCropCircle(
-        originalImage,
-        centerX: center.xi,
-        centerY: center.yi,
-        radius: min(rect.width, rect.height) ~/ 2,
-      ),
-    ),
-  );
-}
-
 // decode orientation awared Image.
-image.Image _fromByteData(Uint8List data) {
-  final tempImage = image.decodeImage(data);
+img.Image _fromByteData(Uint8List data) {
+  final tempImage = img.decodeImage(data);
   assert(tempImage != null);
 
   // check orientation
   switch (tempImage?.exif.exifIfd.orientation ?? -1) {
     case 3:
-      return image.copyRotate(tempImage!, angle: 180);
+      return img.copyRotate(tempImage!, angle: 180);
     case 6:
-      return image.copyRotate(tempImage!, angle: 90);
+      return img.copyRotate(tempImage!, angle: 90);
     case 8:
-      return image.copyRotate(tempImage!, angle: -90);
+      return img.copyRotate(tempImage!, angle: -90);
   }
   return tempImage!;
 }
+
+class _CopyCropParams {
+  img.Image image;
+  int x;
+  int y;
+  int width;
+  int height;
+  _CopyCropParams(
+      {required this.image,
+      required this.x,
+      required this.y,
+      required this.width,
+      required this.height});
+}
+
+img.Image _copyCrop(_CopyCropParams params) => img.copyCrop(params.image,
+    x: params.x, y: params.y, width: params.width, height: params.height);

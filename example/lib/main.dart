@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:image/image.dart' as image;
 
 void main() {
   runApp(MyApp());
@@ -59,7 +60,7 @@ class _CropSampleState extends State<CropSample> {
   var _isSumbnail = false;
   var _isCropping = false;
   var _isCircleUi = false;
-  Uint8List? _croppedData;
+  image.Image? _croppedData;
   var _statusText = '';
 
   @override
@@ -186,7 +187,7 @@ class _CropSampleState extends State<CropSample> {
                   replacement: Center(
                     child: _croppedData == null
                         ? SizedBox.shrink()
-                        : Image.memory(_croppedData!),
+                        : Image.memory(_croppedData!.toUint8List()),
                   ),
                 ),
               ),
@@ -244,9 +245,10 @@ class _CropSampleState extends State<CropSample> {
                             setState(() {
                               _isCropping = true;
                             });
-                            _isCircleUi
-                                ? _cropController.cropCircle()
-                                : _cropController.crop();
+                            //_isCircleUi
+                            //? _cropController.cropCircle()
+                            //:
+                            _cropController.crop();
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 16),
